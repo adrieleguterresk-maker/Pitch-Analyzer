@@ -25,30 +25,44 @@ class PitchController {
 
   /**
    * POST /api/pitch/upload
+   * Accepts multipart/form-data (req.file) or application/json (req.body.fileUrl, req.body.fileName)
    */
   static async handleUpload(req, res) {
     try {
-      if (!req.file) {
+      let originalname, buffer, finalFileUrl;
+
+      // Case 1: Direct Supabase Upload (bypassing Vercel 4.5MB limit)
+      if (req.body && req.body.fileUrl) {
+        originalname = req.body.fileName || 'ArquivodeVendas.pdf';
+        finalFileUrl = req.body.fileUrl; // Keep the remote URL
+        
+        // Fetch the file buffer from the remote URL to process it
+        const remoteRes = await fetch(finalFileUrl);
+        if (!remoteRes.ok) throw new Error('Não foi possível baixar o arquivo do Supabase.');
+        const arrayBuffer = await remoteRes.arrayBuffer();
+        buffer = Buffer.from(arrayBuffer);
+      } 
+      // Case 2: Traditional FormData Upload (files < 4.5MB)
+      else if (req.file) {
+        originalname = req.file.originalname;
+        buffer = req.file.buffer;
+        
+        // Fix encoding for filenames with accents
+        originalname = Buffer.from(originalname, 'latin1').toString('utf8').normalize('NFC');
+        
+        // Save file to temporary disk
+        const { fileUrl } = StorageService.save(buffer, originalname);
+        finalFileUrl = fileUrl;
+      } else {
         return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
       }
 
-      let { originalname, buffer } = req.file;
-      // Fix encoding for filenames with accents (Multer uses latin1 by default)
-      // We also normalize to NFC for better cross-platform support
-      originalname = Buffer.from(originalname, 'latin1').toString('utf8').normalize('NFC');
+      // Create pitch record
+      const pitch = await Pitch.create({ fileName: originalname, fileUrl: finalFileUrl });
 
-      // 1. Save file to disk
-      const { fileUrl } = StorageService.save(buffer, originalname);
-
-      // 2. Create pitch record
-      const pitch = await Pitch.create({ fileName: originalname, fileUrl });
-
-      // 3. Kick off async analysis (non-blocking)
+      // Kick off async analysis (non-blocking)
       const wsClients = req.app.get('wsClients') || null;
       
-      // On Vercel, the function might end after res.json, 
-      // but we'll try to trigger the analysis anyway.
-      // The frontend will poll the status.
       AnalysisController.runAnalysis(pitch.id, buffer, wsClients).catch((err) => {
         console.error('Analysis pipeline error:', err.message);
         Pitch.updateStatus(pitch.id, 'error');

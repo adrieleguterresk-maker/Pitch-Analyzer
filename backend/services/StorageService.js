@@ -27,15 +27,22 @@ class StorageService {
   }
 
   /**
-   * Reads a file from disk and returns its buffer.
-   * @param {string} fileUrl - relative URL like /uploads/xxx.pdf
-   * @returns {Buffer}
+   * Reads a file from disk or fetches it from a remote URL, returning its buffer.
+   * @param {string} fileUrl - relative URL like /uploads/xxx.pdf or absolute https://...
+   * @returns {Promise<Buffer>}
    */
-  static read(fileUrl) {
+  static async read(fileUrl) {
+    if (fileUrl.startsWith('http')) {
+      const res = await fetch(fileUrl);
+      if (!res.ok) throw new Error('Falha ao baixar arquivo remoto.');
+      const arrayBuffer = await res.arrayBuffer();
+      return Buffer.from(arrayBuffer);
+    }
     const safeName = path.basename(fileUrl);
     const filePath = path.join(UPLOAD_DIR, safeName);
     return fs.readFileSync(filePath);
   }
+
 
   /**
    * Deletes a file from disk.

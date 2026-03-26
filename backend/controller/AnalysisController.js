@@ -98,7 +98,7 @@ class AnalysisController {
       if (!pitch) return res.status(404).json({ error: 'Pitch não encontrado.' });
 
       const StorageService = require('../services/StorageService');
-      const pdfBuffer = StorageService.read(pitch.file_url);
+      const pdfBuffer = await StorageService.read(pitch.file_url);
       const wsClients = req.app.get('wsClients') || null;
 
       // In serverless, we might want to wait for the analysis to avoid process killing,

@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
 
 const API = ''; // Empty means relative to same host
 const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
@@ -124,18 +125,41 @@ export default function UploadView() {
     setProgress(5);
     setStep('uploading');
 
-    const formData = new FormData();
-    formData.append('pdf', file);
-
     try {
+      let reqBody;
+      let reqHeaders = {};
+
+      // If Supabase is configured, upload directly to circumvent Vercel 4.5MB limit
+      if (supabase && file.size > 4 * 1024 * 1024) { // Only bypass if > 4MB (Vercel limit)
+        const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+        
+        const { data, error: uploadError } = await supabase.storage
+          .from('pitches')
+          .upload(safeName, file, { cacheControl: '3600', upsert: false });
+
+        if (uploadError) throw new Error('Falha ao enviar arquivo para o Supabase: ' + uploadError.message);
+        
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage.from('pitches').getPublicUrl(safeName);
+
+        reqBody = JSON.stringify({ fileUrl: publicUrl, fileName: file.name });
+        reqHeaders = { 'Content-Type': 'application/json' };
+      } else {
+        // Fallback to traditional FormData upload if small enough or no Supabase
+        const formData = new FormData();
+        formData.append('pdf', file);
+        reqBody = formData;
+      }
+
       const res = await fetch(`${API}/api/pitch/upload`, {
         method: 'POST',
-        body: formData,
+        headers: reqHeaders,
+        body: reqBody,
       });
 
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Falha no upload');
+        throw new Error(err.error || 'Falha ao iniciar processamento do upload.');
       }
 
       const { pitchId } = await res.json();
