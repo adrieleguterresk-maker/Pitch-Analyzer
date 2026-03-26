@@ -1,20 +1,25 @@
-# 🎯 Pitch Analyzer
+## 🌍 Deploy no Vercel (Novo!)
 
-Sistema premium para análise de pitches de vendas em PDF usando OpenAI GPT-4o e geração de relatórios profissionais em PDF.
+O projeto agora está **100% pronto para a Vercel** em um único repositório!
 
-## 🚀 Tecnologias
+1.  **Conecte o GitHub**: Importe o repositório na Vercel.
+2.  **Configurações Automáticas**: O arquivo `vercel.json` na raiz já cuida de tudo:
+    -   Frontend é construído automaticamente.
+    -   Backend vira funções serverless na rota `/api`.
+3.  **Variáveis de Ambiente**: No painel da Vercel, adicione:
+    -   `OPENAI_API_KEY`
+    -   `DATABASE_URL` (Sua URL do Supabase)
+    -   `GPT_MODEL` (ex: `gpt-4o`)
 
-- **Frontend:** React, Vite, Chart.js, Tailwind-like CSS
-- **Backend:** Node.js, Express, Puppeteer (PDF Export)
-- **Banco de Dados:** PostgreSQL (Supabase)
-- **AI:** OpenAI Engine (GPT-4o)
+---
 
-## 📁 Estrutura
+## 📁 Estrutura Monorepo
 
 ```
 análise de pitch/
-├── backend/     ← API Node.js + Express
-└── frontend/    ← Dashboard React + Vite
+├── backend/     ← API Serverless (Puppeteer + AI)
+├── frontend/    ← Dashboard React (Vite)
+└── vercel.json  ← Configuração de Roteamento
 ```
 
 ---

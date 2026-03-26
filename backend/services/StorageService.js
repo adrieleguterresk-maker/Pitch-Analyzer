@@ -1,20 +1,20 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 require('dotenv').config();
 
-const UPLOAD_DIR = path.resolve(process.env.UPLOAD_DIR || './uploads');
+// Use /tmp for Vercel, or local ./uploads for dev
+const isVercel = !!process.env.VERCEL;
+const UPLOAD_DIR = isVercel ? os.tmpdir() : path.resolve(process.env.UPLOAD_DIR || './uploads');
 
-// Ensure upload directory exists
-if (!fs.existsSync(UPLOAD_DIR)) {
+// Ensure upload directory exists (not needed for /tmp but good for local)
+if (!isVercel && !fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
 class StorageService {
   /**
    * Saves a file buffer to disk and returns a relative URL path.
-   * @param {Buffer} buffer - file content
-   * @param {string} fileName - sanitized file name
-   * @returns {{ filePath: string, fileUrl: string }}
    */
   static save(buffer, fileName) {
     const safeName = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
@@ -22,7 +22,7 @@ class StorageService {
     fs.writeFileSync(filePath, buffer);
     return {
       filePath,
-      fileUrl: `/uploads/${safeName}`,
+      fileUrl: isVercel ? `/tmp/${safeName}` : `/uploads/${safeName}`,
     };
   }
 

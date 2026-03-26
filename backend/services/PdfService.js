@@ -1,29 +1,44 @@
-const puppeteer = require('puppeteer');
+const chromium = require('@sparticuz/chromium');
+const puppeteer = require('puppeteer-core');
 
 class PdfService {
   static async generate(data) {
     const { analysis, pitch } = data;
-    const browser = await puppeteer.launch({
-      headless: 'new',
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
-    const page = await browser.newPage();
-    const html = this.buildHtml(analysis, pitch);
-    await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
-    const pdf = await page.pdf({
-      format: 'A4',
-      printBackground: true,
-      margin: { top: '48px', bottom: '55px', left: '0px', right: '0px' },
-      displayHeaderFooter: true,
-      headerTemplate: '<div></div>',
-      footerTemplate: `
-        <div style="font-family:Inter,sans-serif;font-size:10px;width:100%;padding:0 40px;display:flex;justify-content:space-between;color:#94a3b8;box-sizing:border-box;">
-          <span>Sales Pitch Analyzer — Relatório Confidencial</span>
-          <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
-        </div>`,
-    });
-    await browser.close();
-    return pdf;
+    
+    let browser;
+    try {
+      // Configure launch options for Vercel vs Local
+      const isDev = process.env.NODE_ENV === 'development' || !process.env.VERCEL;
+      
+      browser = await puppeteer.launch({
+        args: isDev ? ['--no-sandbox', '--disable-setuid-sandbox'] : chromium.args,
+        defaultViewport: chromium.defaultViewport,
+        executablePath: isDev 
+          ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' // Guess for local windows
+          : await chromium.executablePath(),
+        headless: chromium.headless,
+      });
+
+      const page = await browser.newPage();
+      const html = this.buildHtml(analysis, pitch);
+      await page.setContent(html, { waitUntil: 'load', timeout: 30000 });
+      
+      const pdf = await page.pdf({
+        format: 'A4',
+        printBackground: true,
+        margin: { top: '48px', bottom: '55px', left: '0px', right: '0px' },
+        displayHeaderFooter: true,
+        headerTemplate: '<div></div>',
+        footerTemplate: `
+          <div style="font-family:Inter,sans-serif;font-size:10px;width:100%;padding:0 40px;display:flex;justify-content:space-between;color:#94a3b8;box-sizing:border-box;">
+            <span>Sales Pitch Analyzer — Relatório Confidencial</span>
+            <span>Página <span class="pageNumber"></span> de <span class="totalPages"></span></span>
+          </div>`,
+      });
+      return pdf;
+    } finally {
+      if (browser) await browser.close();
+    }
   }
 
   // ─── Score bar ────────────────────────────────────────────────────────

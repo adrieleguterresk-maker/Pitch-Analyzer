@@ -14,7 +14,7 @@ import { Radar } from 'react-chartjs-2';
 
 ChartJS.register(RadialLinearScale, PointElement, LineElement, Filler, Tooltip, Legend);
 
-const API = 'http://localhost:3001';
+const API = ''; // Empty means relative to same host
 
 const SCORE_LABELS = {
   authorityAndCredibility: 'Autoridade & Credibilidade',

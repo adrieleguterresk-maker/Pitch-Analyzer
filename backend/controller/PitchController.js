@@ -44,12 +44,14 @@ class PitchController {
       const pitch = await Pitch.create({ fileName: originalname, fileUrl });
 
       // 3. Kick off async analysis (non-blocking)
-      const wsClients = req.app.get('wsClients');
-      setImmediate(() => {
-        AnalysisController.runAnalysis(pitch.id, buffer, wsClients).catch((err) => {
-          console.error('Analysis pipeline error:', err.message);
-          Pitch.updateStatus(pitch.id, 'error');
-        });
+      const wsClients = req.app.get('wsClients') || null;
+      
+      // On Vercel, the function might end after res.json, 
+      // but we'll try to trigger the analysis anyway.
+      // The frontend will poll the status.
+      AnalysisController.runAnalysis(pitch.id, buffer, wsClients).catch((err) => {
+        console.error('Analysis pipeline error:', err.message);
+        Pitch.updateStatus(pitch.id, 'error');
       });
 
       return res.status(201).json({ pitchId: pitch.id, status: 'pending' });

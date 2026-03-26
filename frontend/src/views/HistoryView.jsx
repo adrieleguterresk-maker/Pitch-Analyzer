@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API = 'http://localhost:3001';
+const API = '';
 
 function scoreColor(score) {
   if (score >= 7) return 'var(--success)';

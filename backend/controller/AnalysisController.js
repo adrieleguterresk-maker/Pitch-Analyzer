@@ -99,16 +99,16 @@ class AnalysisController {
 
       const StorageService = require('../services/StorageService');
       const pdfBuffer = StorageService.read(pitch.file_url);
-      const wsClients = req.app.get('wsClients');
+      const wsClients = req.app.get('wsClients') || null;
 
-      // Run async
-      setImmediate(() => {
-        AnalysisController.runAnalysis(pitchId, pdfBuffer, wsClients).catch(
-          console.error
-        );
+      // In serverless, we might want to wait for the analysis to avoid process killing,
+      // but to keep the UI responsive, we'll try to run it and let the client poll for results.
+      // Note: This is an edge case in Vercel. Standard Web Service is better for long tasks.
+      AnalysisController.runAnalysis(pitchId, pdfBuffer, wsClients).catch(err => {
+        console.error('Async analysis failed:', err.message);
       });
 
-      return res.json({ pitchId, status: 'processing' });
+      return res.json({ pitchId, status: 'processing', message: 'Análise iniciada. Por favor, aguarde...' });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

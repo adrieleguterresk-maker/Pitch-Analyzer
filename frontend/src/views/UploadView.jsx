@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API = 'http://localhost:3001';
-const WS_URL = 'ws://localhost:3001';
+const API = ''; // Empty means relative to same host
+const WS_URL = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}`;
 
 const STEP_LABELS = {
+  uploading: 'Enviando arquivo...',
   extracting: 'Extraindo texto do PDF...',
   extracted: 'Texto extraído com sucesso',
   analyzing: 'Enviando para GPT-4o API...',
@@ -23,33 +24,78 @@ export default function UploadView() {
   const inputRef = useRef(null);
   const navigate = useNavigate();
   const wsRef = useRef(null);
+  const pollRef = useRef(null);
+
+  const startPolling = useCallback((pitchId) => {
+    if (pollRef.current) clearInterval(pollRef.current);
+    
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`${API}/api/pitch/${pitchId}/status`);
+        if (!res.ok) return;
+        const data = await res.json();
+        
+        if (data.status === 'completed' && data.analysisId) {
+          clearInterval(pollRef.current);
+          setStep('completed');
+          setProgress(100);
+          setTimeout(() => navigate(`/analysis/${data.analysisId}`), 800);
+        } else if (data.status === 'error') {
+          clearInterval(pollRef.current);
+          setUploading(false);
+          setError('Erro durante o processamento do PDF.');
+        } else {
+          // Update progress based on actual DB status
+          if (data.status === 'processing') {
+            setStep('analyzing');
+            setProgress(prev => prev < 90 ? prev + 5 : prev);
+          }
+        }
+      } catch (e) {
+        console.error('Polling error:', e);
+      }
+    }, 3000);
+  }, [navigate]);
 
   const connectWs = useCallback((pitchId) => {
-    const ws = new WebSocket(WS_URL);
-    wsRef.current = ws;
+    try {
+      const ws = new WebSocket(WS_URL);
+      wsRef.current = ws;
 
-    ws.onmessage = (e) => {
-      const data = JSON.parse(e.data);
-      if (data.pitchId !== pitchId) return;
-      setProgress(data.progress || 0);
-      setStep(data.step || '');
+      ws.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.pitchId !== pitchId) return;
+        setProgress(data.progress || 0);
+        setStep(data.step || '');
 
-      if (data.step === 'completed') {
-        ws.close();
-        setTimeout(() => navigate(`/analysis/${data.analysisId}`), 800);
-      }
-      if (data.step === 'error') {
-        ws.close();
-        setUploading(false);
-        setError(data.error || 'Erro desconhecido durante a análise.');
-      }
-    };
+        if (data.step === 'completed' || data.analysisId) {
+          if (pollRef.current) clearInterval(pollRef.current);
+          ws.close();
+          setTimeout(() => navigate(`/analysis/${data.analysisId}`), 1000);
+        }
+        if (data.step === 'error') {
+          if (pollRef.current) clearInterval(pollRef.current);
+          ws.close();
+          setUploading(false);
+          setError(data.error || 'Erro desconhecido durante a análise.');
+        }
+      };
 
-    ws.onerror = () => {
-      setError('Conexão com o servidor perdida.');
-      setUploading(false);
-    };
-  }, [navigate]);
+      ws.onerror = () => {
+        console.warn('WebSocket failed, falling back to polling.');
+        startPolling(pitchId);
+      };
+
+      ws.onclose = () => {
+        // Only poll if not successful yet
+        if (step !== 'completed' && uploading) {
+           startPolling(pitchId);
+        }
+      };
+    } catch (e) {
+      startPolling(pitchId);
+    }
+  }, [navigate, startPolling, step, uploading]);
 
   const handleFile = (f) => {
     setError('');
