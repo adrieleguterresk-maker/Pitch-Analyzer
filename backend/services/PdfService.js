@@ -1,7 +1,25 @@
 const chromium = require('@sparticuz/chromium');
 const puppeteer = require('puppeteer-core');
+const pdfParse = require('pdf-parse');
 
 class PdfService {
+  /**
+   * Extrai o texto de um buffer de PDF
+   */
+  static async extractText(buffer) {
+    try {
+      if (!buffer || buffer.length === 0) throw new Error('Buffer vazio recebido para extração.');
+      const data = await pdfParse(buffer);
+      if (!data || !data.text) throw new Error('Não foi possível ler texto deste PDF.');
+      return {
+        text: data.text,
+        numPages: data.numpages || 1,
+      };
+    } catch (err) {
+      console.error('PdfService.extractText error:', err.message);
+      throw new Error('Falha ao extrair texto do PDF. O arquivo pode estar corrompido, protegido por senha, ou ser apenas imagens.');
+    }
+  }
   static async generate(data) {
     const { analysis, pitch } = data;
     
