@@ -45,7 +45,7 @@ class PdfService {
           ? await chromium.executablePath() 
           : (process.platform === 'win32' 
               ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' 
-              : '/usr/bin/google-chrome'), // Path in Dockerfile
+              : (fs.existsSync('/usr/bin/chromium') ? '/usr/bin/chromium' : '/usr/bin/google-chrome')), // Path in Dockerfile
         headless: isVercel ? chromium.headless : 'new',
       };
 
