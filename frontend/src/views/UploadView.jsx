@@ -129,8 +129,8 @@ export default function UploadView() {
       let reqBody;
       let reqHeaders = {};
 
-      // If Supabase is configured, upload directly to circumvent Vercel 4.5MB limit
-      if (supabase && file.size > 4 * 1024 * 1024) { // Only bypass if > 4MB (Vercel limit)
+      // Always upload to Supabase Storage to ensure availability across instances and bypass cloud limits
+      if (supabase) {
         const safeName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
         
         const { data, error: uploadError } = await supabase.storage

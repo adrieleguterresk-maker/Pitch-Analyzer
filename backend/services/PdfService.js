@@ -1,6 +1,15 @@
-const chromium = require('@sparticuz/chromium');
-const puppeteer = require('puppeteer-core');
+const fs = require('fs');
+const path = require('path');
 const pdfParse = require('pdf-parse');
+let puppeteer;
+try {
+  // Use puppeteer-core only if chromium is available (Vercel)
+  // Otherwise try standard puppeteer (Render/Local)
+  puppeteer = require('puppeteer-core');
+} catch (e) {
+  puppeteer = require('puppeteer');
+}
+const chromium = require('@sparticuz/chromium');
 
 class PdfService {
   /**
@@ -25,17 +34,22 @@ class PdfService {
     
     let browser;
     try {
-      // Configure launch options for Vercel vs Local
-      const isDev = process.env.NODE_ENV === 'development' || !process.env.VERCEL;
+      // Configure launch options for Vercel vs Render vs Local
+      const isVercel = !!process.env.VERCEL;
+      const isRender = !!process.env.RENDER || fs.existsSync('/opt/render'); // Heuristic for Render
       
-      browser = await puppeteer.launch({
-        args: isDev ? ['--no-sandbox', '--disable-setuid-sandbox'] : chromium.args,
-        defaultViewport: chromium.defaultViewport,
-        executablePath: isDev 
-          ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' // Guess for local windows
-          : await chromium.executablePath(),
-        headless: chromium.headless,
-      });
+      const launchOptions = {
+        args: isVercel ? chromium.args : ['--disable-setuid-sandbox', '--no-sandbox', '--no-zygote'],
+        defaultViewport: isVercel ? chromium.defaultViewport : { width: 1280, height: 720 },
+        executablePath: isVercel 
+          ? await chromium.executablePath() 
+          : (process.platform === 'win32' 
+              ? 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe' 
+              : '/usr/bin/google-chrome'), // Path in Dockerfile
+        headless: isVercel ? chromium.headless : 'new',
+      };
+
+      browser = await puppeteer.launch(launchOptions);
 
       const page = await browser.newPage();
       const html = this.buildHtml(analysis, pitch);

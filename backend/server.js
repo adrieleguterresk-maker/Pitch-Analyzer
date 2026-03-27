@@ -26,13 +26,17 @@ app.set('wsClients', wsClients);
 
 // ─── Middleware ───────────────────────────────────────────────────────────────
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: '*', // Allow all for now, or use process.env.FRONTEND_URL
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 app.use(express.json({ limit: '110mb' }));
 app.use(express.urlencoded({ limit: '110mb', extended: true }));
 app.use('/uploads', express.static(path.resolve('./uploads')));
+
+// Serve Frontend Static Files (Production)
+const frontendPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendPath));
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -57,7 +61,13 @@ app.get('/api/report/:analysisId/pdf', ReportController.generatePdf);
 // ─── Health Check ─────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 
-// ─── Global Error Handler ─────────────────────────────────────────────────────
+// Handle React Router - Serve index.html for unknown routes
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api')) return next();
+  res.sendFile(path.join(frontendPath, 'index.html'));
+});
+
+// Global Error Handler
 app.use((err, req, res, next) => {
   console.error('Unhandled error:', err.message);
   res.status(500).json({ error: 'Erro interno do servidor.' });
