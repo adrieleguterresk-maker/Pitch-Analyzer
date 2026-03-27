@@ -24,7 +24,6 @@ RUN apt-get update && apt-get install -y \
     libgbm1 \
     libasound2 \
     libpangocairo-1.0-0 \
-    pwd \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
